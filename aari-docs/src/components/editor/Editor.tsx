@@ -27,6 +27,7 @@ export function Editor({
   editable = true,
 }: EditorProps) {
   const editor = useEditor({
+    immediatelyRender: false, // Add this line for SSR
     extensions: [
       StarterKit.configure({
         heading: {
