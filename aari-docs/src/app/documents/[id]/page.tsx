@@ -205,12 +205,12 @@ export default function DocumentPage({ params }: PageProps) {
 
   const handleEditorCommentClick = (commentId: string) => {
     setActiveCommentId(commentId)
-    setIsSidebarOpen(true) // Open sidebar on mobile when clicking highlight
+    setIsSidebarOpen(true)
     const commentElement = window.document.getElementById(`comment-${commentId}`)
     if (commentElement) {
       setTimeout(() => {
         commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 300) // Wait for sidebar animation
+      }, 300)
     }
   }
 
@@ -272,7 +272,7 @@ export default function DocumentPage({ params }: PageProps) {
             ) : null}
           </div>
           
-          {/* Save button - smaller on mobile */}
+          {/* Save button */}
           <Button 
             size="sm" 
             onClick={saveDocument} 
@@ -283,7 +283,7 @@ export default function DocumentPage({ params }: PageProps) {
             <span className="hidden sm:inline ml-2">Save</span>
           </Button>
 
-          {/* Comments toggle button - visible on mobile */}
+          {/* Comments toggle button - visible on mobile/tablet */}
           <Button
             variant="outline"
             size="sm"
@@ -334,16 +334,6 @@ export default function DocumentPage({ params }: PageProps) {
             lg:transform-none lg:transition-none
             ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
           `}>
-            {/* Mobile close button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSidebarOpen(false)}
-              className="absolute top-2 right-2 z-10 lg:hidden"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-
             <CommentsSidebar
               comments={comments}
               selectedText={selectedText}
@@ -358,6 +348,8 @@ export default function DocumentPage({ params }: PageProps) {
               onReply={handleReply}
               onDeleteReply={handleDeleteReply}
               onEditReply={handleEditReply}
+              onClose={() => setIsSidebarOpen(false)}
+              isMobile={true}
             />
           </div>
         </>

@@ -37,6 +37,8 @@ interface CommentsSidebarProps {
   onReply: (commentId: string, content: string) => void
   onDeleteReply: (replyId: string) => void
   onEditReply: (replyId: string, content: string) => void
+  onClose?: () => void
+  isMobile?: boolean
 }
 
 export function CommentsSidebar({
@@ -53,6 +55,8 @@ export function CommentsSidebar({
   onReply,
   onDeleteReply,
   onEditReply,
+  onClose,
+  isMobile = false,
 }: CommentsSidebarProps) {
   const [newComment, setNewComment] = useState('')
   const [showResolved, setShowResolved] = useState(false)
@@ -73,16 +77,29 @@ export function CommentsSidebar({
 
   return (
     <aside className="w-full h-full border-l bg-gray-50 flex flex-col">
-      {/* Header */}
+      {/* Header - Fixed layout to prevent overlap */}
       <div className="p-3 sm:p-4 border-b bg-white shrink-0">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900 flex items-center gap-2 text-sm sm:text-base">
-            <MessageSquare className="h-4 w-4" />
-            Comments
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2 text-sm sm:text-base min-w-0">
+            <MessageSquare className="h-4 w-4 shrink-0" />
+            <span className="truncate">Comments</span>
           </h2>
-          <span className="text-xs sm:text-sm text-gray-500">
-            {activeComments.length} active
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
+              {activeComments.length} active
+            </span>
+            {/* Close button for mobile - inline with header */}
+            {isMobile && onClose && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="lg:hidden h-8 w-8 p-0"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -252,8 +269,8 @@ function CommentItem({
       onClick={onClick}
     >
       {/* Comment Header */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-start justify-between mb-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {userImage ? (
             <img
               src={userImage}
@@ -266,7 +283,7 @@ function CommentItem({
               {userName[0]?.toUpperCase() || '?'}
             </div>
           )}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
               {userName}
             </p>
@@ -304,7 +321,7 @@ function CommentItem({
       </div>
 
       {/* Highlighted Text */}
-      <div className="bg-yellow-50 p-2 rounded text-xs text-gray-600 mb-2 border-l-2 border-yellow-400">
+      <div className="bg-yellow-50 p-2 rounded text-xs text-gray-600 mb-2 border-l-2 border-yellow-400 break-words">
         &ldquo;{comment.highlightedText.slice(0, 80)}
         {comment.highlightedText.length > 80 ? '...' : ''}&rdquo;
       </div>
@@ -335,7 +352,7 @@ function CommentItem({
           </div>
         </div>
       ) : (
-        <p className="text-xs sm:text-sm text-gray-700 mb-3">{comment.content}</p>
+        <p className="text-xs sm:text-sm text-gray-700 mb-3 break-words">{comment.content}</p>
       )}
 
       {/* Resolve/Reopen Button */}
@@ -458,8 +475,8 @@ function ReplyItem({ reply, isOwner, onDelete, onEdit }: ReplyItemProps) {
 
   return (
     <div className="text-sm">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {userImage ? (
             <img
               src={userImage}
@@ -531,7 +548,7 @@ function ReplyItem({ reply, isOwner, onDelete, onEdit }: ReplyItemProps) {
           </div>
         </div>
       ) : (
-        <p className="text-xs sm:text-sm text-gray-700">{reply.content}</p>
+        <p className="text-xs sm:text-sm text-gray-700 break-words">{reply.content}</p>
       )}
     </div>
   )

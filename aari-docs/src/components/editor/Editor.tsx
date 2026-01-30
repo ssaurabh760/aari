@@ -7,8 +7,6 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Toolbar } from './Toolbar'
 import { CommentHighlight } from './extensions/CommentHighlight'
-import { AIBubbleMenu } from './AIBubbleMenu'
-import { SlashCommands } from './SlashCommands'
 import { useEffect, useCallback, useRef } from 'react'
 
 export interface TextSelection {
@@ -23,12 +21,9 @@ export interface CommentMark {
   to: number
 }
 
-// TipTap content can be either HTML string or JSON object
-type EditorContentType = string | object
-
 interface EditorProps {
-  content: EditorContentType
-  onUpdate: (content: EditorContentType) => void
+  content: string | object
+  onUpdate: (content: string | object) => void
   onSelectionChange?: (selection: TextSelection | null) => void
   onCommentClick?: (commentId: string) => void
   commentMarks?: CommentMark[]
@@ -45,8 +40,7 @@ export function Editor({
   activeCommentId,
   editable = true,
 }: EditorProps) {
-  // Track if we've set initial content to avoid overwriting user edits
-  const hasSetInitialContent = useRef(false)
+  const hasInitializedContent = useRef(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -64,7 +58,7 @@ export function Editor({
         },
       }),
       Placeholder.configure({
-        placeholder: 'Start writing... (Type "/" for commands)',
+        placeholder: 'Start writing...',
       }),
       CommentHighlight.configure({
         HTMLAttributes: {
@@ -72,10 +66,9 @@ export function Editor({
         },
       }),
     ],
-    content: '', // Start empty, we'll set content in useEffect
+    content: '',
     editable,
     onUpdate: ({ editor }) => {
-      // Return JSON for consistency with database storage
       onUpdate(editor.getJSON())
     },
     onSelectionUpdate: ({ editor }) => {
@@ -90,7 +83,7 @@ export function Editor({
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[500px] px-8 py-6',
+          'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[300px] sm:min-h-[500px] px-4 sm:px-8 py-4 sm:py-6',
       },
       handleClick: (view, pos, event) => {
         // Check if clicked on a comment highlight
@@ -108,19 +101,17 @@ export function Editor({
     },
   })
 
-  // Set content when it changes from props (e.g., when document loads)
+  // Update editor content when prop changes
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return
-
-    // Only set content if it's meaningful (not empty string/object)
-    const hasContent =
-      typeof content === 'string'
-        ? content.length > 0
-        : content && typeof content === 'object' && Object.keys(content).length > 0
-
-    if (hasContent && !hasSetInitialContent.current) {
-      editor.commands.setContent(content)
-      hasSetInitialContent.current = true
+    if (editor && content && !editor.isDestroyed) {
+      const hasContent = typeof content === 'string' 
+        ? content.length > 0 
+        : (content && typeof content === 'object' && Object.keys(content).length > 0)
+      
+      if (hasContent && !hasInitializedContent.current) {
+        editor.commands.setContent(content)
+        hasInitializedContent.current = true
+      }
     }
   }, [editor, content])
 
@@ -168,7 +159,6 @@ export function Editor({
 
   useEffect(() => {
     if (editor && commentMarks.length > 0) {
-      // Delay to ensure editor is ready
       const timer = setTimeout(applyHighlights, 100)
       return () => clearTimeout(timer)
     }
@@ -197,11 +187,8 @@ export function Editor({
   return (
     <div className="flex flex-col h-full">
       <Toolbar editor={editor} />
-      <div className="flex-1 overflow-y-auto relative">
+      <div className="flex-1 overflow-y-auto">
         <EditorContent editor={editor} />
-        {/* AI Features */}
-        <AIBubbleMenu editor={editor} />
-        <SlashCommands editor={editor} />
       </div>
     </div>
   )
