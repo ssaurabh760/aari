@@ -88,7 +88,7 @@ export default function DocumentPage({ params }: PageProps) {
       if (title !== doc.title || content) {
         saveDocument()
       }
-    }, 2000)
+    }, 5000)
 
     return () => clearTimeout(timer)
   }, [title, content, doc, saveDocument])
