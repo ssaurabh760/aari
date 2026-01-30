@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Editor, TextSelection, CommentMark } from '@/components/editor'
 import { CommentsSidebar } from '@/components/comments'
 import { useDocument, useComments } from '@/lib/hooks'
@@ -9,17 +10,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Loader2, Save, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { UserMenu } from '@/components/UserMenu'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-// TipTap content can be either HTML string or JSON object
-type EditorContent = string | object
-
 export default function DocumentPage({ params }: PageProps) {
   const { id } = use(params)
   const router = useRouter()
+  const { data: session, status: sessionStatus } = useSession()
+  
   const {
     document: doc,
     isLoading: docLoading,
@@ -37,13 +38,14 @@ export default function DocumentPage({ params }: PageProps) {
   } = useComments(id)
 
   const [title, setTitle] = useState('')
-  // Content can be string (HTML) or object (TipTap JSON)
-  const [content, setContent] = useState<EditorContent>('')
+  const [content, setContent] = useState<string | object>('')
   const [selectedText, setSelectedText] = useState<TextSelection | null>(null)
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  // Get current user ID from session
+  const currentUserId = session?.user?.id || ''
 
   // Convert comments to marks for highlighting
   const commentMarks: CommentMark[] = useMemo(() => {
@@ -56,69 +58,36 @@ export default function DocumentPage({ params }: PageProps) {
       }))
   }, [comments])
 
-  // Fetch a user ID to use (first user from the database)
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await fetch('/api/users')
-        if (res.ok) {
-          const { data } = await res.json()
-          if (data && data.length > 0) {
-            setCurrentUserId(data[0].id)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-      }
-    }
-    fetchUser()
-  }, [])
-
   // Initialize content from document
   useEffect(() => {
     if (doc) {
       setTitle(doc.title)
-      // Pass content directly - TipTap handles both string (HTML) and object (JSON)
-      if (doc.content) {
-        setContent(doc.content as EditorContent)
-      }
+      setContent(doc.content as string | object)
     }
   }, [doc])
-
-  // Track if content has changed from initial load
-  const [hasContentChanged, setHasContentChanged] = useState(false)
-
-  // Handle content updates from editor
-  const handleContentUpdate = useCallback((newContent: EditorContent) => {
-    setContent(newContent)
-    setHasContentChanged(true)
-  }, [])
 
   // Auto-save with debounce
   const saveDocument = useCallback(async () => {
     if (!doc) return
-    if (!hasContentChanged && title === doc.title) return // Skip if nothing changed
-    
     setIsSaving(true)
     try {
       await updateDocument({ title, content })
       setLastSaved(new Date())
-      setHasContentChanged(false) // Reset after successful save
     } catch (error) {
       console.error('Failed to save:', error)
       toast.error('Failed to save document')
     } finally {
       setIsSaving(false)
     }
-  }, [doc, title, content, hasContentChanged, updateDocument])
+  }, [doc, title, content, updateDocument])
 
   // Debounced auto-save
   useEffect(() => {
     if (!doc) return
-    if (!hasContentChanged && title === doc.title) return // Don't set timer if nothing changed
-    
     const timer = setTimeout(() => {
-      saveDocument()
+      if (title !== doc.title || content) {
+        saveDocument()
+      }
     }, 2000)
 
     return () => clearTimeout(timer)
@@ -132,7 +101,7 @@ export default function DocumentPage({ params }: PageProps) {
     selectionTo: number
   ) => {
     if (!currentUserId) {
-      toast.error('No user available. Please run the seed script first.')
+      toast.error('You must be signed in to comment')
       return
     }
     try {
@@ -152,7 +121,7 @@ export default function DocumentPage({ params }: PageProps) {
 
   const handleReply = async (commentId: string, replyContent: string) => {
     if (!currentUserId) {
-      toast.error('No user available')
+      toast.error('You must be signed in to reply')
       return
     }
     try {
@@ -213,7 +182,6 @@ export default function DocumentPage({ params }: PageProps) {
 
   const handleCommentClick = (commentId: string) => {
     setActiveCommentId(commentId)
-    // Scroll comment into view in sidebar
     const commentElement = window.document.getElementById(`comment-${commentId}`)
     if (commentElement) {
       commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -222,14 +190,14 @@ export default function DocumentPage({ params }: PageProps) {
 
   const handleEditorCommentClick = (commentId: string) => {
     setActiveCommentId(commentId)
-    // Scroll to comment in sidebar
     const commentElement = window.document.getElementById(`comment-${commentId}`)
     if (commentElement) {
       commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }
 
-  if (docLoading) {
+  // Show loading while checking session
+  if (sessionStatus === 'loading' || docLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -270,22 +238,25 @@ export default function DocumentPage({ params }: PageProps) {
           />
         </div>
 
-        <div className="flex items-center gap-3 text-sm text-gray-500">
-          {isSaving ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </span>
-          ) : lastSaved ? (
-            <span className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-500" />
-              Saved
-            </span>
-          ) : null}
-          <Button size="sm" onClick={saveDocument} disabled={isSaving}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            {isSaving ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </span>
+            ) : lastSaved ? (
+              <span className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-500" />
+                Saved
+              </span>
+            ) : null}
+            <Button size="sm" onClick={saveDocument} disabled={isSaving}>
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          </div>
+          <UserMenu />
         </div>
       </header>
 
@@ -295,7 +266,7 @@ export default function DocumentPage({ params }: PageProps) {
         <div className="flex-1 overflow-y-auto">
           <Editor
             content={content}
-            onUpdate={handleContentUpdate}
+            onUpdate={setContent}
             onSelectionChange={setSelectedText}
             onCommentClick={handleEditorCommentClick}
             commentMarks={commentMarks}
@@ -308,6 +279,7 @@ export default function DocumentPage({ params }: PageProps) {
           comments={comments}
           selectedText={selectedText}
           activeCommentId={activeCommentId}
+          currentUserId={currentUserId}
           onCommentClick={handleCommentClick}
           onAddComment={handleAddComment}
           onCancelComment={() => setSelectedText(null)}

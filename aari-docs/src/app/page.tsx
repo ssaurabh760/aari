@@ -2,63 +2,101 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { useDocuments } from '@/lib/hooks'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  FileText,
+  Plus,
+  Search,
+  Loader2,
+  MoreVertical,
+  Trash2,
+} from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  FileText,
-  Plus,
-  Loader2,
-  MoreHorizontal,
-  Trash2,
-  MessageSquare,
-  Search,
-} from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
+import { UserMenu } from '@/components/UserMenu'
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const { documents, isLoading, createDocument, deleteDocument } = useDocuments()
-  const [searchQuery, setSearchQuery] = useState('')
+  const [search, setSearch] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreateDocument = async () => {
+  const filteredDocuments = documents.filter((doc) =>
+    doc.title.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const handleCreate = async () => {
     setIsCreating(true)
     try {
-      const doc = await createDocument('Untitled Document')
+      const doc = await createDocument()
       router.push(`/documents/${doc.id}`)
-    } catch (error) {
-      console.error('Failed to create document:', error)
+    } catch {
+      toast.error('Failed to create document')
     } finally {
       setIsCreating(false)
     }
   }
 
-  const handleDeleteDocument = async (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm('Are you sure you want to delete this document?')) {
+    if (!confirm('Are you sure you want to delete this document?')) return
+    try {
       await deleteDocument(id)
+      toast.success('Document deleted')
+    } catch {
+      toast.error('Failed to delete document')
     }
   }
 
-  const filteredDocuments = documents.filter((doc) =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const formatDate = (date: string | Date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    )
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-800">AARI Docs</h1>
-            <Button onClick={handleCreateDocument} disabled={isCreating}>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <FileText className="h-5 w-5 text-white" />
+            </div>
+            <h1 className="text-xl font-semibold text-gray-900">AARI Docs</h1>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search documents..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button onClick={handleCreate} disabled={isCreating}>
               {isCreating ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -66,71 +104,55 @@ export default function Home() {
               )}
               New Document
             </Button>
+            <UserMenu />
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white"
-          />
-        </div>
-
-        {/* Documents Grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          </div>
-        ) : filteredDocuments.length === 0 ? (
-          <div className="text-center py-20">
-            <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-medium text-gray-600 mb-2">
-              {searchQuery ? 'No documents found' : 'No documents yet'}
-            </h2>
-            <p className="text-gray-500 mb-6">
-              {searchQuery
-                ? 'Try a different search term'
-                : 'Create your first document to get started'}
+      {/* Welcome Banner */}
+      {session?.user && (
+        <div className="bg-blue-50 border-b border-blue-100">
+          <div className="max-w-6xl mx-auto px-4 py-3">
+            <p className="text-blue-800">
+              Welcome back, <span className="font-medium">{session.user.name}</span>!
             </p>
-            {!searchQuery && (
-              <Button onClick={handleCreateDocument}>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">
+          Recent Documents
+        </h2>
+
+        {filteredDocuments.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 mb-4">
+              {search
+                ? 'No documents found matching your search'
+                : 'No documents yet'}
+            </p>
+            {!search && (
+              <Button onClick={handleCreate} disabled={isCreating}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Document
+                Create your first document
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredDocuments.map((doc) => (
               <div
                 key={doc.id}
                 onClick={() => router.push(`/documents/${doc.id}`)}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer group"
+                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 rounded-lg">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-800 line-clamp-1">
-                        {doc.title || 'Untitled'}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {formatDistanceToNow(new Date(doc.updatedAt), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    </div>
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <FileText className="h-5 w-5 text-blue-600" />
                   </div>
-
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -139,12 +161,12 @@ export default function Home() {
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={(e) => handleDeleteDocument(doc.id, e)}
+                        onClick={(e) => handleDelete(doc.id, e as unknown as React.MouseEvent)}
                         className="text-red-600"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -153,18 +175,17 @@ export default function Home() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="h-4 w-4" />
-                    {(doc as unknown as { _count?: { comments: number } })._count?.comments || 0} comments
-                  </span>
-                </div>
+                <h3 className="font-medium text-gray-900 truncate mb-1">
+                  {doc.title || 'Untitled'}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Updated {formatDate(doc.updatedAt)}
+                </p>
               </div>
             ))}
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

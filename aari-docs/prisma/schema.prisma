@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,55 +11,100 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// NextAuth.js Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application Models
 model User {
-  id        String    @id @default(cuid())
-  name      String
-  email     String    @unique
-  avatarUrl String?
-  createdAt DateTime  @default(now())
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  emailVerified DateTime?
+  image     String?
+  avatarUrl String?  // Legacy field, use image instead
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // NextAuth relations
+  accounts  Account[]
+  sessions  Session[]
+
+  // App relations
   comments  Comment[]
   replies   Reply[]
 }
 
 model Document {
-  id        String    @id @default(cuid())
-  title     String    @default("Untitled")
-  content   Json      @default("{}")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  comments  Comment[]
+  id        String   @id @default(cuid())
+  title     String   @default("Untitled")
+  content   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([updatedAt])
+  comments Comment[]
 }
 
 model Comment {
   id              String   @id @default(cuid())
-  documentId      String
-  userId          String
+  content         String
   highlightedText String
   selectionFrom   Int
   selectionTo     Int
-  content         String
   isResolved      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user            User     @relation(fields: [userId], references: [id])
-  replies         Reply[]
 
-  @@index([documentId])
-  @@index([isResolved])
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  replies Reply[]
 }
 
 model Reply {
   id        String   @id @default(cuid())
-  commentId String
-  userId    String
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
 
-  @@index([commentId])
+  commentId String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

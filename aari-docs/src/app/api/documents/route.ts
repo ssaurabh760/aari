@@ -1,25 +1,17 @@
-import { prisma } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
 
-// GET /api/documents - List all documents
+// GET /api/documents - Get ALL documents (visible to all authenticated users)
 export async function GET() {
   try {
     const documents = await prisma.document.findMany({
       orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: { comments: true },
-        },
-      },
+      // No user filter - all documents visible to everyone
     })
 
     return NextResponse.json({ data: documents })
   } catch (error) {
-    console.error('Failed to fetch documents:', error)
+    console.error('Error fetching documents:', error)
     return NextResponse.json(
       { error: 'Failed to fetch documents' },
       { status: 500 }
@@ -27,7 +19,7 @@ export async function GET() {
   }
 }
 
-// POST /api/documents - Create new document
+// POST /api/documents - Create a new document
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -42,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: document }, { status: 201 })
   } catch (error) {
-    console.error('Failed to create document:', error)
+    console.error('Error creating document:', error)
     return NextResponse.json(
       { error: 'Failed to create document' },
       { status: 500 }
